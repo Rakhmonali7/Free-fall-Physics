@@ -149,11 +149,6 @@ getCountryData('portugal')
 //     countriesContainer.style.opacity = 1;
 //   });
 // }
-// buttn.addEventListener('click', function (e) {
-//   e.preventDefault();
-//   countryName = userInput.value;
-//   getCountryData(countryName);
-// });
 
 // const renderCountry = function (data) {
 //   const html = `
@@ -192,9 +187,9 @@ getCountryData('portugal')
 // };
 // getCountryData('portugal');
 
-const renderCountry = function (data) {
+const renderCountry = function (data, neighbour = '') {
   const html = `
-            <article class="country">
+            <article class= 'country ${neighbour}'>
               <img class="country__img" src="${data.flag}" />
               <div class="country__data">
                 <h3 class="country__name">${data.name}</h3>
@@ -216,9 +211,31 @@ const renderCountry = function (data) {
 };
 
 const getCountryData = function (countryName) {
+  // country 1
+
   fetch(`https://countries-api-836d.onrender.com/countries/name/${countryName}`)
     .then(response => response.json())
-    .then(data => renderCountry(data[0]));
+    .then(data => {
+      renderCountry(data[0]);
+      const neighbour = data[0]?.borders[0];
+
+      //country 2
+
+      return fetch(
+        `https://countries-api-836d.onrender.com/countries/alpha/${neighbour}`
+      )
+        .then(response => response.json())
+        .then(data => renderCountry(data, 'neighbour'));
+    });
 };
+<<<<<<< HEAD
 getCountryData('portugal');
 >>>>>>> 6f8e763 (chaining)
+=======
+
+buttn.addEventListener('click', function (e) {
+  e.preventDefault();
+  countryName = userInput.value;
+  getCountryData(countryName);
+});
+>>>>>>> 9282d20 (chaini part2)
