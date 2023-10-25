@@ -33,22 +33,30 @@ function renderError(msg) {
   countriesContainer.insertAdjacentText('beforeend', msg);
 }
 
+const getJSON = function (url, errorMsg = 'Something went wrong') {
+  return fetch(url).then(response => {
+    if (!response.ok) throw new Error(`${errorMsg} ${response.status}`);
+    return response.json();
+  });
+};
+
 const getCountryData = function (countryName) {
   // country 1
 
-  fetch(`https://countries-api-836d.onrender.com/countries/name/${countryName}`)
-    .then(response => response.json())
+  getJSON(
+    `https://countries-api-836d.onrender.com/countries/name/${countryName}`,
+    'Country not found'
+  )
     .then(data => {
       renderCountry(data[0]);
       const neighbour = data[0]?.borders[0];
 
       //country 2
 
-      return fetch(
-        `https://countries-api-836d.onrender.com/countries/alpha/${neighbour}`
-      )
-        .then(response => response.json())
-        .then(data => renderCountry(data, 'neighbour'));
+      return getJSON(
+        `https://countries-api-836d.onrender.com/countries/alpha/${neighbour}`,
+        'neighbour not foud'
+      ).then(data => renderCountry(data, 'neighbour'));
     })
     .catch(err =>
       renderError(`UPS something went wrong ${err.message}, Try Again!`)
@@ -62,5 +70,5 @@ const getCountryData = function (countryName) {
 //   getCountryData(countryName);
 // });
 btn.addEventListener('click', function () {
-  getCountryData('portugal');
+  getCountryData('australia');
 });
