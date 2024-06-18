@@ -1,154 +1,148 @@
-'use strict';
+let animationInterval;
+let airResistance;
+const scaleFactor = 5; // Scale factor to convert meters to pixels
+let maxHeightY = null; // This will store the y-coordinate of the highest point reached
 
-const btn = document.querySelector('.btn-country');
-const countriesContainer = document.querySelector('.countries');
-
-const userInput = document.getElementById('userInput');
-const buttn = document.getElementById('btn');
-
-const renderCountry = function (data, neighbour = '') {
-  const html = `
-            <article class= 'country ${neighbour}'>
-              <img class="country__img" src="${data.flag}" />
-              <div class="country__data">
-                <h3 class="country__name">${data.name}</h3>
-                <h4 class="country__region">${data.region}</h4>
-                <p class="country__row"><span>👫</span>${(
-                  +data.population / 1000000
-                ).toFixed(1)} million</p>
-                <p class="country__row"><span>🗣️</span>${
-                  data.languages[0].name
-                }</p>
-                <p class="country__row"><span>💰</span>${
-                  data.currencies[0].name
-                }</p>
-              </div>
-            </article>
-        `;
-  countriesContainer.insertAdjacentHTML('beforeend', html);
-};
-
-// function renderError(msg) {
-//   countriesContainer.insertAdjacentText('beforeend', msg);
-// }
-
-// const getJSON = function (url, errorMsg = 'Something went wrong') {
-//   return fetch(url).then(response => {
-//     if (!response.ok) throw new Error(`${errorMsg} ${response.status}`);
-//     return response.json();
-//   });
-// };
-
-// const getCountryData = function (countryName) {
-//   // country 1
-
-//   getJSON(
-//     `https://countries-api-836d.onrender.com/countries/name/${countryName}`,
-//     'Country not found'
-//   )
-//     .then(data => {
-//       console.log(data);
-//       console.log(data[0]);
-//       renderCountry(data[0]);
-//       const neighbour = data[0]?.borders[0];
-
-//       //country 2
-
-//       return getJSON(
-//         `https://countries-api-836d.onrender.com/countries/alpha/${neighbour}`,
-//         'neighbour not foud'
-//       ).then(data => renderCountry(data, 'neighbour'));
-//     })
-//     .catch(err =>
-//       renderError(`UPS something went wrong ${err.message}, Try Again!`)
-//     )
-//     .finally(() => (countriesContainer.style.opacity = 1));
-// };
-
-// // buttn.addEventListener('click', function (e) {
-// //   e.preventDefault();
-// //   countryName = userInput.value;
-// //   getCountryData(countryName);
-// // });
-// btn.addEventListener('click', function () {
-//   getCountryData('uzbekistan');
-// });
-
-/////////////////
-
-// //////////////////// CODING CHALLENGE ///////////////////////////
-
-///////////////
-// CHALLENGE 2 PICTURE 2 DELAY SWAP
-///////////
-// const wait = function (seconds) {
-//   return new Promise(function (resolve) {
-//     setTimeout(resolve, seconds * 1000);
-//   });
-// };
-
-// const imgContainer = document.querySelector('.images');
-
-// const createImg = function (imgPath) {
-//   return new Promise(function (resoleve, reject) {
-//     const img = document.createElement('img');
-//     img.src = imgPath;
-//     img.addEventListener('load', function () {
-//       imgContainer.append(img);
-//       resoleve(img);
-//     });
-//     img.addEventListener('eror', function () {
-//       reject(new Error('Image not found'));
-//     });
-//   });
-// };
-
-// let currentImg;
-
-// createImg('img/img-1.jpg')
-//   .then(img => {
-//     currentImg = img;
-//     console.log('Image 1 loaded');
-//     return wait(2);
-//   })
-//   .then(() => {
-//     currentImg.style.display = 'none';
-//     return createImg('img/img-2.jpg');
-//   })
-//   .then(img => {
-//     currentImg = img;
-//     console.log('Image 2 loaded');
-//     return wait(2);
-//   })
-//   .then(() => (currentImg.style.display = 'none'))
-//   .catch(err => console.error(`!!Error: ${err}`));
-
-const getPosition = function () {
-  return new Promise(function (resolve, reject) {
-    navigator.geolocation.getCurrentPosition(resolve, reject);
+document
+  .getElementById('simulation-form')
+  .addEventListener('submit', function (event) {
+    event.preventDefault();
+    const initialHeight = parseFloat(
+      document.getElementById('initial_height').value
+    );
+    const initialVelocity = parseFloat(
+      document.getElementById('initial_velocity').value
+    );
+    const launchAngle = parseFloat(
+      document.getElementById('launch_angle').value
+    );
+    airResistance = parseFloat(document.getElementById('air_resistance').value);
+    if (animationInterval) clearInterval(animationInterval);
+    startSimulation(initialHeight, initialVelocity, launchAngle, airResistance);
   });
-};
 
-const whereAmI = async function (country) {
-  //geting location
-  const pos = await getPosition();
-  const { latitude: lat, longitude: lng } = pos.coords;
+function startSimulation(
+  initialHeight,
+  initialVelocity,
+  launchAngle,
+  airResistanceValue
+) {
+  const g = 9.81;
+  const container = document.getElementById('simulation-container');
+  const canvas = document.getElementById('simulation-canvas');
+  const context = canvas.getContext('2d');
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+  const ball = document.getElementById('ball');
+  const groundY = canvas.height;
+  const ballRadius = 10;
+  let t = 0;
+  let logInterval = 0.2;
+  let lastLogTime = 0;
+  const dt = 0.02;
+  const initialVelocityX =
+    initialVelocity * Math.cos((launchAngle * Math.PI) / 180);
+  const initialVelocityY =
+    -initialVelocity * Math.sin((launchAngle * Math.PI) / 180);
+  const initialX = canvas.width / 2;
+  let x = initialX;
+  let y = canvas.height - initialHeight * scaleFactor;
+  let velocityX = initialVelocityX;
+  let velocityY = initialVelocityY;
+  let velocityHistoryList = document.getElementById('velocity-history');
+  velocityHistoryList.innerHTML = '';
+  let previousPositions = [];
 
-  // reverse geocoding
+  function draw() {
+    context.clearRect(0, 0, canvas.width, canvas.height);
 
-  const resGeo = await fetch(`https://geocode.xyz/${lat},${lng}?geoit=json`);
-  const dataGeo = await resGeo.json();
-  console.log(dataGeo);
-  // coumtry data
+    // Draw height scale on the left
+    context.beginPath();
+    context.strokeStyle = 'black';
+    context.fillStyle = 'black';
+    context.font = '12px Arial';
+    for (let i = 0; i <= 500; i += 10) {
+      const yPos = canvas.height - i * scaleFactor;
+      context.moveTo(0, yPos);
+      context.lineTo(10, yPos);
+      context.stroke();
+      context.fillText(i.toString(), 15, yPos + 4);
+    }
 
-  const data = await fetch(
-    `https://countries-api-836d.onrender.com/countries/name/${dataGeo.}`
-  );
-  const finData = await data.json();
-  console.log('here');
-  console.log(finData);
-  renderCountry(finData[0]);
-};
+    // Draw trajectory
+    context.beginPath();
+    context.moveTo(initialX, canvas.height - initialHeight * scaleFactor);
+    previousPositions.forEach(pos => {
+      context.lineTo(pos.x, pos.y);
+    });
+    context.strokeStyle = 'blue';
+    context.stroke();
 
-whereAmI();
-console.log('first');
+    // Draw highest point marker
+    if (maxHeightY !== null) {
+      context.beginPath();
+      context.moveTo(0, maxHeightY);
+      context.lineTo(canvas.width, maxHeightY);
+      context.strokeStyle = 'red';
+      context.stroke();
+    }
+
+    // Draw ball
+    context.beginPath();
+    context.arc(x, y, ballRadius, 0, 2 * Math.PI);
+    context.fillStyle = 'blue';
+    context.fill();
+    context.closePath();
+  }
+
+  function updateInfo() {
+    const velocity = Math.sqrt(velocityX ** 2 + velocityY ** 2);
+    const currentHeight = (canvas.height - y) / scaleFactor;
+    if (maxHeightY === null || y < maxHeightY) {
+      maxHeightY = y; // Update the highest y-coordinate
+    }
+    document.getElementById('time-info').innerText = `Time: ${t.toFixed(2)} s`;
+    document.getElementById(
+      'velocity-info'
+    ).innerText = `Velocity: ${velocity.toFixed(2)} m/s`;
+    document.getElementById('position-info').innerText = `Position: (${(
+      x / scaleFactor
+    ).toFixed(2)}, ${currentHeight.toFixed(2) * 0}) m`;
+
+    if (t - lastLogTime >= logInterval) {
+      lastLogTime = t;
+      let li = document.createElement('li');
+      li.textContent = `Time: ${t.toFixed(1)} s, Velocity: ${velocity.toFixed(
+        2
+      )} m/s, Height: ${currentHeight.toFixed(2)} m`;
+      velocityHistoryList.appendChild(li);
+    }
+  }
+
+  function update() {
+    t += dt;
+    velocityX -= airResistance * velocityX * dt;
+    velocityY += g * dt - airResistance * velocityY * dt;
+    x += velocityX * dt * scaleFactor;
+    y += velocityY * dt * scaleFactor;
+
+    if (y + ballRadius >= groundY) {
+      y = groundY - ballRadius;
+      clearInterval(animationInterval);
+      // alert(`Simulation ended. Maximum height reached: ${((canvas.height - maxHeightY) / scaleFactor).toFixed(2)} m`);
+    } else {
+      previousPositions.push({ x: x, y: y });
+    }
+
+    draw();
+    updateInfo();
+  }
+
+  draw();
+  animationInterval = setInterval(update, dt * 1000);
+}
+
+const checkbox = document.getElementById('checkbox');
+checkbox.addEventListener('change', () => {
+  document.body.classList.toggle('dark');
+});
